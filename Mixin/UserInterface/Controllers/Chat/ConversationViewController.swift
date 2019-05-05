@@ -7,6 +7,7 @@ class ConversationViewController: UIViewController {
     
     static var positions = [String: Position]()
     
+    @IBOutlet weak var navigationBarView: UIView!
     @IBOutlet weak var galleryWrapperView: UIView!
     @IBOutlet weak var backgroundImageView: UIImageView!
     @IBOutlet weak var titleLabel: UILabel!
@@ -21,6 +22,7 @@ class ConversationViewController: UIViewController {
     @IBOutlet weak var loadingView: ActivityIndicatorView!
     @IBOutlet weak var titleStackView: UIStackView!
     
+    @IBOutlet weak var navigationBarTopConstraint: NSLayoutConstraint!
     @IBOutlet weak var titleViewTopConstraint: NSLayoutConstraint!
     @IBOutlet weak var titleViewHeightConstraint: NSLayoutConstraint!
     @IBOutlet weak var scrollToBottomWrapperHeightConstraint: NSLayoutConstraint!
@@ -99,7 +101,7 @@ class ConversationViewController: UIViewController {
     
     private var maxInputWrapperHeight: CGFloat {
         return AppDelegate.current.window!.frame.height
-            - tableView.contentInset.top
+            - navigationBarView.frame.height
             - minInputWrapperTopMargin
     }
     
@@ -302,6 +304,7 @@ class ConversationViewController: UIViewController {
                 } else {
                     newHeight = min(newHeight, regularInputWrapperHeight)
                 }
+                updateNavigationBarPositionWithInputWrapperViewHeight(oldHeight: inputWrapperHeight, newHeight: newHeight)
                 inputWrapperHeight = newHeight
                 view.layoutIfNeeded()
             }
@@ -316,11 +319,14 @@ class ConversationViewController: UIViewController {
                     } else {
                         conversationInputViewController.dismissCustomInput(minimize: true)
                     }
+                    setNavigationBarHidden(false)
                 } else {
                     if inputWrapperHeight > conversationInputViewController.regularHeight {
                         conversationInputViewController.setPreferredContentHeightAnimated(.maximized)
+                        setNavigationBarHidden(true)
                     } else {
                         conversationInputViewController.setPreferredContentHeightAnimated(.regular)
+                        setNavigationBarHidden(false)
                     }
                 }
             }
@@ -524,6 +530,7 @@ class ConversationViewController: UIViewController {
     
     // MARK: - Interface
     func updateInputWrapper(for preferredContentHeight: CGFloat, animated: Bool) {
+        let oldHeight = inputWrapperHeightConstraint.constant
         let newHeight = min(maxInputWrapperHeight, preferredContentHeight)
         inputWrapperHeightConstraint.constant = newHeight
         var bottomInset = newHeight
@@ -534,6 +541,7 @@ class ConversationViewController: UIViewController {
             UIView.setAnimationDuration(0.5)
             UIView.setAnimationCurve(.overdamped)
         }
+        updateNavigationBarPositionWithInputWrapperViewHeight(oldHeight: oldHeight, newHeight: newHeight)
         tableView.setContentInsetBottom(bottomInset, automaticallyAdjustContentOffset: adjustTableViewContentOffsetWhenInputWrapperHeightChanges)
         view.layoutIfNeeded()
         if animated {
@@ -1039,6 +1047,17 @@ extension ConversationViewController: PhotoAssetPickerDelegate {
 // MARK: - UI Related Helpers
 extension ConversationViewController {
     
+    private func setNavigationBarHidden(_ hidden: Bool) {
+        if hidden {
+            navigationBarTopConstraint.constant = navigationBarView.frame.height
+            tableView.contentInset.top = view.compatibleSafeAreaInsets.top
+        } else {
+            navigationBarTopConstraint.constant = 0
+            tableView.contentInset.top = navigationBarView.frame.height
+        }
+        statusBarHidden = hidden
+    }
+    
     private func updateNavigationBar() {
         if let dataSource = dataSource, dataSource.category == .group {
             let conversation = dataSource.conversation
@@ -1051,6 +1070,31 @@ extension ConversationViewController {
             participantsLabel.text = user.identityNumber
             titleLabel.text = user.fullName
             avatarImageView.setImage(with: user)
+        }
+    }
+    
+    private func updateNavigationBarPositionWithInputWrapperViewHeight(oldHeight: CGFloat, newHeight: CGFloat) {
+        let diff = newHeight - oldHeight
+        if newHeight > conversationInputViewController.regularHeight {
+            let top = navigationBarTopConstraint.constant + diff
+            let maxTop = navigationBarView.frame.height
+            let navigationBarTop = min(maxTop, max(0, top))
+            navigationBarTopConstraint.constant = navigationBarTop
+            tableView.contentInset.top = max(view.compatibleSafeAreaInsets.top,
+                                             navigationBarView.frame.height - navigationBarTop)
+            if !statusBarHidden {
+                UIView.animate(withDuration: 0.2, delay: 0, options: [.beginFromCurrentState], animations: {
+                    self.statusBarHidden = true
+                }, completion: nil)
+            }
+        } else {
+            navigationBarTopConstraint.constant = 0
+            tableView.contentInset.top = navigationBarView.frame.height
+            if statusBarHidden {
+                UIView.animate(withDuration: 0.2, delay: 0, options: [.beginFromCurrentState], animations: {
+                    self.statusBarHidden = false
+                }, completion: nil)
+            }
         }
     }
     
