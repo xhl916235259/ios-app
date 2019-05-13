@@ -7,7 +7,9 @@ import FirebaseMLVision
 import Bugsnag
 
 class WebWindow: BottomSheetView {
-
+    
+    private static let iTunesAppUrlRegex = try? NSRegularExpression(pattern: "^https://itunes\\.apple\\.com/.*app.*id[0-9]", options: .caseInsensitive)
+    
     @IBOutlet weak var dismissButton: UIButton!
     @IBOutlet weak var iconImageView: UIImageView!
     @IBOutlet weak var titleLabel: UILabel!
@@ -210,7 +212,9 @@ extension WebWindow: WKNavigationDelegate {
         if url.isFileURL {
             decisionHandler(.allow)
         } else if let scheme = url.scheme, scheme == "http" || scheme == "https" {
-            if url.host == "itunes.apple.com" && url.pathComponents[2] == "app" && UIApplication.shared.canOpenURL(url) {
+            let absoluteString = url.absoluteString
+            let fullRange = NSRange(location: 0, length: (absoluteString as NSString).length)
+            if UIApplication.shared.canOpenURL(url), let regex = WebWindow.iTunesAppUrlRegex, regex.firstMatch(in: absoluteString, options: [], range: fullRange) != nil {
                 UIApplication.shared.open(url, options: [:], completionHandler: nil)
                 decisionHandler(.cancel)
             } else {
