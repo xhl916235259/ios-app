@@ -203,25 +203,27 @@ extension WebWindow: WKNavigationDelegate {
             decisionHandler(.cancel)
             return
         }
-        if UrlWindow.checkUrl(url: url, fromWeb: true) {
+        guard !UrlWindow.checkUrl(url: url, fromWeb: true) else {
             decisionHandler(.cancel)
             return
-        } else if "file" == url.scheme {
-            decisionHandler(.allow)
-            return
         }
-
-        guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
+        if url.isFileURL {
+            decisionHandler(.allow)
+        } else if let scheme = url.scheme, scheme == "http" || scheme == "https" {
+            if url.host == "itunes.apple.com" && url.pathComponents[2] == "app" && UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                decisionHandler(.cancel)
+            } else {
+                decisionHandler(.allow)
+            }
+        } else {
             if UIApplication.shared.canOpenURL(url) {
                 UIApplication.shared.open(url, options: [:], completionHandler: nil)
             } else {
                 UIApplication.trackError("WebWindow", action: "webview navigation canOpenURL false", userInfo: ["url": url.absoluteString])
             }
             decisionHandler(.cancel)
-            return
         }
-        
-        decisionHandler(.allow)
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
